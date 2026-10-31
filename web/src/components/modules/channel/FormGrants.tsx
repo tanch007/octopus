@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { IconButton } from '@/components/common/IconButton';
 import { useModelProbe } from './probe';
+import { ModelProbeButton } from './ModelProbe';
 import { grantKey, type ChannelFormState } from './state';
 
 // PROTOCOL_COLUMNS 是授权矩阵的协议列, 顺序即列顺序; 位值与后端 model.Protocol 一致。
@@ -102,9 +103,10 @@ function GrantCells({ state, setState, models, keyNames, remove, icon: Icon, tip
 // FormGrants 模型集合与授权矩阵。
 // 模型行的复选框一键设置该模型下所有凭据, 凭据子行只改自己那一条授权;
 // 协议位全为空即该授权不存在, 提交时被丢弃。
-export function FormGrants({ state, setState }: {
+export function FormGrants({ state, setState, channelId }: {
     state: ChannelFormState;
     setState: (next: ChannelFormState) => void;
+    channelId?: number; // 渠道主键, 为空表示尚未保存, 此时不给测试入口。
 }) {
     const t = useTranslations('channel.form');
     const { probe, pendingKey } = useModelProbe();
@@ -238,6 +240,8 @@ export function FormGrants({ state, setState }: {
                                             {granted}/{keyNames.length}
                                         </span>
                                     </button>
+                                    {/* 测试入口紧挨模型名: 它测的正是这一行的模型, 与凭据和协议格在同一行里对得上。 */}
+                                    <ModelProbeButton channelId={channelId} state={state} modelName={modelName} />
                                     <GrantCells
                                         state={state} setState={setState}
                                         models={[modelName]} keyNames={keyNames}

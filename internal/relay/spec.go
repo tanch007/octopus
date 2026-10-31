@@ -20,6 +20,7 @@ type protocolSpec struct {
 	protocol model.Protocol      // 该协议对应的请求协议位, 随请求状态推给界面。
 	mask     model.Protocol      // 选路时成员授权需声明的协议位集合。
 	media    bool                // 是否为媒体类协议: 请求体与响应体按原样透传, 不做跨协议转换。
+	name     string              // 协议名, 供探测结果展示; 转发链路自身不读它。
 }
 
 // protocolSpecOf 返回客户端协议对应的转发规格。

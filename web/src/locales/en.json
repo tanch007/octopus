@@ -492,5 +492,25 @@
             "modelRemove": "Remove model",
             "grantRemove": "Remove this key’s grant"
         }
+    },
+    "probe": {
+        "modelTitle": "Model Test",
+        "groupTitle": "Group Test",
+        "protocol": "Client Protocol",
+        "key": "Credential",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Leave empty to send Hello",
+        "run": "Run Test",
+        "running": "Testing…",
+        "success": "Test Passed",
+        "failed": "Test Failed",
+        "channel": "Channel",
+        "model": "Model",
+        "upstreamProtocol": "Upstream Protocol",
+        "tokens": "input {input} / output {output} tokens",
+        "showRaw": "Show Raw Response",
+        "hideRaw": "Hide Raw Response",
+        "modelTest": "Test this model",
+        "modelNeedSaved": "Save the channel before testing"
     }
 }

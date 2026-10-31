@@ -492,5 +492,25 @@
             "modelRemove": "移除模型",
             "grantRemove": "移除該憑據的授權"
         }
+    },
+    "probe": {
+        "modelTitle": "模型測試",
+        "groupTitle": "分組測試",
+        "protocol": "用戶端協議",
+        "key": "憑據",
+        "prompt": "提示詞",
+        "promptPlaceholder": "留空則發送 Hello",
+        "run": "開始測試",
+        "running": "測試中…",
+        "success": "測試通過",
+        "failed": "測試失敗",
+        "channel": "渠道",
+        "model": "模型",
+        "upstreamProtocol": "上游協議",
+        "tokens": "輸入 {input} / 輸出 {output} tokens",
+        "showRaw": "查看原始響應",
+        "hideRaw": "收起原始響應",
+        "modelTest": "測試該模型",
+        "modelNeedSaved": "保存渠道後才能測試"
     }
 }

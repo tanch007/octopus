@@ -133,6 +133,62 @@ func pickGroupItem(group model.Group, mask model.Protocol) model.GroupItem {
 	return model.GroupItem{}
 }
 
+// pickGroupItemPreview 只读地按当前路由状态挑一个成员, 不改动任何进程内状态。
+// 探测用它回答"此刻真实请求会落到谁身上": 过滤规则与 pickGroupItem 一致, 但不写回当前成员,
+// 也不占用恢复探测位, 探测因此不会把真实流量的选路带偏。
+// 不可用的成员(渠道或凭据被停用)不参与挑选: 它们无法转发, 选中也只是把失败提前。
+func pickGroupItemPreview(group model.Group, mask model.Protocol) model.GroupItem {
+	items := make([]model.GroupItem, 0, len(group.Items))
+	for _, item := range group.Items {
+		if item.Protocols&mask == 0 || !item.Available {
+			continue
+		}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		return model.GroupItem{}
+	}
+
+	if group.Mode == model.GroupModeManual {
+		for _, item := range items {
+			if item.ID == group.ActiveItemID {
+				return item
+			}
+		}
+		return model.GroupItem{}
+	}
+
+	routeMu.Lock()
+	defer routeMu.Unlock()
+
+	route := routes[group.ID]
+	if route == nil {
+		// 尚无路由状态时按优先级取第一个成员: 与真实选路冷启动后的选择一致。
+		return items[0]
+	}
+	now := time.Now().UnixMilli()
+	// 亲和期内的当前成员优先, 与真实选路一致。
+	if route.CurrentItemID != 0 && route.AffinityUntil > now {
+		if item := itemOf(items, route.CurrentItemID); item.ID != 0 {
+			return item
+		}
+	}
+	for _, item := range items {
+		if item.ID == route.CurrentItemID {
+			break
+		}
+		deadline, cooling := route.Cooldowns[item.ID]
+		if cooling && deadline > now {
+			continue
+		}
+		return item
+	}
+	if route.CurrentItemID != 0 {
+		return itemOf(items, route.CurrentItemID)
+	}
+	return model.GroupItem{}
+}
+
 // recordRouteSuccess 上报一轮成功: 结束该成员的冷却与探测占用, 并在故障切换后按配置开始亲和。
 func recordRouteSuccess(group model.Group, itemID int) {
 	if group.Mode == model.GroupModeManual {

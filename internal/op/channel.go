@@ -340,6 +340,42 @@ func ChannelGrantGet(id int) (model.ChannelGrant, error) {
 	return grant, nil
 }
 
+// ChannelGrantGetByNames 按渠道内的模型名与凭据名取渠道授权, 并补齐其模型与凭据。
+// 界面上的模型与凭据都按名称展示, 探测时也只有名称可用, 故在此按名称定位:
+// 模型名与凭据名在渠道内各自唯一, 故一对名称唯一确定一条授权。
+// 凭据被停用, 以及模型, 凭据缺失时一律返回错误, 与按主键取的口径一致。
+func ChannelGrantGetByNames(channelID int, modelName, keyName string) (model.ChannelGrant, error) {
+	var modelID, keyID int
+	found := false
+	for _, channelModel := range channelModelCache.GetAll() {
+		if channelModel.ChannelID == channelID && channelModel.Name == modelName {
+			modelID = channelModel.ID
+			found = true
+			break
+		}
+	}
+	if !found {
+		return model.ChannelGrant{}, fmt.Errorf("channel model %q not found", modelName)
+	}
+	found = false
+	for _, channelKey := range channelKeyCache.GetAll() {
+		if channelKey.ChannelID == channelID && channelKey.Name == keyName {
+			keyID = channelKey.ID
+			found = true
+			break
+		}
+	}
+	if !found {
+		return model.ChannelGrant{}, fmt.Errorf("channel key %q not found", keyName)
+	}
+	for _, grant := range channelGrantCache.GetAll() {
+		if grant.ChannelModelID == modelID && grant.ChannelKeyID == keyID {
+			return ChannelGrantGet(grant.ID)
+		}
+	}
+	return model.ChannelGrant{}, fmt.Errorf("channel grant not found for model %q and key %q", modelName, keyName)
+}
+
 // ChannelGrantCandidates 返回全部渠道授权及其展示字段, 供分组页选取成员。
 // 可用性与 GroupList 补齐成员时同一口径: 渠道与凭据均启用即可用, 由此候选与已选成员不会各判一套。
 // 两侧任一缺失的授权直接跳过: 它无法转发, 也无从展示名称。

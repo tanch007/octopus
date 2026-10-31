@@ -239,7 +239,7 @@ function ChannelFormFields({ channel, onBack }: { channel?: ChannelDetail; onBac
                     )}
 
                     {step === 'keys' && <FormKeys state={state} setState={setState} />}
-                    {step === 'grants' && <FormGrants state={state} setState={setState} />}
+                    {step === 'grants' && <FormGrants state={state} setState={setState} channelId={channel?.id} />}
 
                     {step === 'advanced' && (
                         <div className="space-y-4 pt-2">

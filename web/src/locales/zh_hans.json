@@ -492,5 +492,25 @@
             "modelRemove": "移除模型",
             "grantRemove": "移除该凭据的授权"
         }
+    },
+    "probe": {
+        "modelTitle": "模型测试",
+        "groupTitle": "分组测试",
+        "protocol": "客户端协议",
+        "key": "凭据",
+        "prompt": "提示词",
+        "promptPlaceholder": "留空则发送 Hello",
+        "run": "开始测试",
+        "running": "测试中…",
+        "success": "测试通过",
+        "failed": "测试失败",
+        "channel": "渠道",
+        "model": "模型",
+        "upstreamProtocol": "上游协议",
+        "tokens": "输入 {input} / 输出 {output} tokens",
+        "showRaw": "查看原始响应",
+        "hideRaw": "收起原始响应",
+        "modelTest": "测试该模型",
+        "modelNeedSaved": "保存渠道后才能测试"
     }
 }

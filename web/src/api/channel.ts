@@ -17,6 +17,11 @@ export const Protocol = {
     OpenAIVideo: 1 << 8,
 } as const;
 
+// OpenAIDialogs 是对话类协议的集合, 位值与后端 model.ProtocolOpenAIDialogs 一致。
+// 三者之间可经转换互相承接, 故声明了其中任意一个的成员即可承接对话请求。
+export const OpenAIDialogs =
+    Protocol.OpenAIChatCompletion | Protocol.OpenAIResponse | Protocol.AnthropicMessage;
+
 // Dialect 是上游在标准协议之上的方言，决定出站转换器的厂商特化配置。
 // 地址与路径不属于方言范畴，由前端按服务商预填到渠道字段上。
 export type Dialect = 'generic';

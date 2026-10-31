@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { SelectedMember } from './ItemList';
 import { MemberList } from './ItemList';
 import { GroupEditor, type GroupEditorValues } from './Editor';
+import { GroupProbeButton } from './GroupProbe';
 import {
     MorphingDialog,
     MorphingDialogContainer,
@@ -156,6 +157,9 @@ export const GroupCard = memo(function GroupCard({ group, now }: { group: Group;
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                    {/* 测试入口与编辑, 复制, 删除并排: 都是对整个分组卡片头部的作用。 */}
+                    <GroupProbeButton group={group} />
+
                     <MorphingDialog>
                         {/* trigger 自身渲染 motion.div 承担弹窗形变, 故由它出元素, IconButton 只补样式。 */}
                         <IconButton asChild className="size-7">
