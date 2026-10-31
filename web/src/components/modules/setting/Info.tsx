@@ -5,7 +5,10 @@ import { useLatestInfo, useNowVersion, useUpdateCore } from '@/api/update';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'unknown'; // 当前前端构建对应的应用版本。
+// 当前前端构建对应的应用版本。
+// 未注入时取 dev, 与后端 conf.Version 的默认值一致: 注入版本号只有发布流程会做,
+// 而本地调试与 CI 构建两端都停在默认值, 取同一个值才不会把正常的构建误报成版本不匹配。
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
 const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO || 'https://github.com/bestruirui/octopus'; // 项目仓库地址。
 
 // SettingInfo 展示版本信息，并在更新后清理本项目的浏览器缓存。
