@@ -238,6 +238,50 @@ The program automatically appends the API version and endpoint path based on the
 | OpenAI Responses | `/v1/responses` | `https://api.openai.com` | `https://api.openai.com/v1/responses` |
 | Anthropic | `/v1/messages` | `https://api.anthropic.com` | `https://api.anthropic.com/v1/messages` |
 | Gemini | `/v1beta/models/:model:generateContent` | `https://generativelanguage.googleapis.com` | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` |
+| OpenAI Embeddings | `/v1/embeddings` | `https://api.openai.com` | `https://api.openai.com/v1/embeddings` |
+| OpenAI Speech | `/v1/audio/speech` | `https://api.openai.com` | `https://api.openai.com/v1/audio/speech` |
+| OpenAI Transcription | `/v1/audio/transcriptions` | `https://api.openai.com` | `https://api.openai.com/v1/audio/transcriptions` |
+| OpenAI Translation | `/v1/audio/translations` | `https://api.openai.com` | `https://api.openai.com/v1/audio/translations` |
+| OpenAI Video | `/v1/videos` | `https://api.openai.com` | `https://api.openai.com/v1/videos` |
+
+**Protocol grants:**
+
+In the channel editor's *Models* step, every grant (model × credential) can declare the protocols it supports:
+
+| Column | Protocol | Endpoint |
+|--------|----------|----------|
+| `chat` | OpenAI Chat Completions | `/v1/chat/completions` |
+| `resp` | OpenAI Responses | `/v1/responses` |
+| `msg` | Anthropic Messages | `/v1/messages` |
+| `emb` | OpenAI Embeddings | `/v1/embeddings` |
+| `tts` | OpenAI Speech | `/v1/audio/speech` |
+| `stt` | OpenAI Transcription | `/v1/audio/transcriptions` |
+| `trn` | OpenAI Translation | `/v1/audio/translations` |
+| `vid` | OpenAI Video | `/v1/videos` |
+
+> 💡 **Tip**: The three dialog protocols convert into each other, so any one of them lets a grant serve chat requests. The media protocols are independent and have no conversion partner — the exact column must be checked, otherwise the group never routes that member to such a request.
+
+---
+
+### 🎬 Media Endpoints
+
+Besides chat, Octopus also proxies the embedding, speech and video endpoints of the OpenAI family. They share the same groups, failover and statistics machinery as chat:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/embeddings` | POST | Text embeddings, returns vectors |
+| `/v1/audio/speech` | POST | Text to speech, returns audio bytes |
+| `/v1/audio/transcriptions` | POST | Speech to text, accepts an audio file (multipart) |
+| `/v1/audio/translations` | POST | Speech translation, accepts an audio file (multipart) |
+| `/v1/videos` | POST | Create a video generation task |
+| `/v1/videos/{id}` | GET | Retrieve the video task status |
+| `/v1/videos/{id}` | DELETE | Delete the video task |
+
+**How requests are handled:**
+
+- The request body is forwarded verbatim; only the `model` field is replaced with the real model name of the selected member, every other field is left untouched
+- The multipart form of a transcription or translation request is re-encoded; the audio file and its content type are preserved
+- Video generation is asynchronous: after creation the task and the channel that served it are recorded, so later retrieval and deletion go back to the same upstream
 
 > 💡 **Tip**: The Base URL does not need to include `/v1`, `/v1beta`, or a specific API endpoint path - the program handles them automatically.
 
@@ -313,7 +357,39 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 ```
 
-### Claude Code
+### Media Endpoints
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:8080/v1",
+    api_key="sk-octopus-",
+)
+
+# Text embeddings
+embedding = client.embeddings.create(model="octopus-embedding", input="hello")
+print(embedding.data[0].embedding)
+
+# Text to speech
+speech = client.audio.speech.create(
+    model="octopus-tts",
+    voice="alloy",
+    input="hello",
+)
+speech.stream_to_file("hello.mp3")
+
+# Speech to text
+with open("hello.mp3", "rb") as audio:
+    transcript = client.audio.transcriptions.create(model="octopus-stt", file=audio)
+print(transcript.text)
+
+# Video generation (asynchronous)
+video = client.videos.create(model="octopus-video", prompt="a cat running on the grass")
+print(video.id)
+```
+
+---
 
 Edit `~/.claude/settings.json`
 

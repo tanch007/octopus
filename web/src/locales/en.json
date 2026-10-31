@@ -465,6 +465,7 @@
             "keysRequiredFirst": "Add a credential first",
             "detailLoading": "Loading channel configuration",
             "detailFailed": "Failed to load channel configuration",
+            "grantProtocols": "Protocol",
             "grantExpandAll": "Expand all",
             "grantCollapseAll": "Collapse all",
             "modelAdd": "Add",

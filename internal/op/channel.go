@@ -21,7 +21,12 @@ var (
 )
 
 // 已定义的全部协议位, 用于校验提交的协议掩码。
-const definedProtocols = model.ProtocolOpenAIChatCompletion | model.ProtocolOpenAIResponse | model.ProtocolAnthropicMessage
+const definedProtocols = model.ProtocolOpenAIDialogs |
+	model.ProtocolOpenAIEmbedding |
+	model.ProtocolOpenAISpeech |
+	model.ProtocolOpenAITranscription |
+	model.ProtocolOpenAITranslation |
+	model.ProtocolOpenAIVideo
 
 // ChannelDetailGet 返回指定渠道的完整配置, 供编辑表单读取。
 func ChannelDetailGet(id int) (model.ChannelDetail, error) {
@@ -104,6 +109,8 @@ func ChannelUpdate(detail *model.ChannelDetail, ctx context.Context) (*model.Cha
 		if err := tx.Model(&model.Channel{}).Where("id = ?", detail.ID).
 			Select("name", "dialect", "enabled", "base_url",
 				"openai_chat_completion_path", "openai_response_path", "anthropic_message_path",
+				"openai_embedding_path", "openai_speech_path",
+				"openai_transcription_path", "openai_translation_path", "openai_video_path",
 				"proxy", "channel_proxy", "custom_header", "param_override", "match_regex").
 			Updates(&model.Channel{ChannelConfig: detail.ChannelConfig}).Error; err != nil {
 			return fmt.Errorf("failed to update channel: %w", err)
@@ -156,6 +163,21 @@ func normalizeChannelConfig(config model.ChannelConfig) (model.ChannelConfig, er
 		return config, err
 	}
 	if config.AnthropicMessagePath, err = normalizedPath(config.AnthropicMessagePath, "/v1/messages"); err != nil {
+		return config, err
+	}
+	if config.OpenAIEmbeddingPath, err = normalizedPath(config.OpenAIEmbeddingPath, "/v1/embeddings"); err != nil {
+		return config, err
+	}
+	if config.OpenAISpeechPath, err = normalizedPath(config.OpenAISpeechPath, "/v1/audio/speech"); err != nil {
+		return config, err
+	}
+	if config.OpenAITranscriptionPath, err = normalizedPath(config.OpenAITranscriptionPath, "/v1/audio/transcriptions"); err != nil {
+		return config, err
+	}
+	if config.OpenAITranslationPath, err = normalizedPath(config.OpenAITranslationPath, "/v1/audio/translations"); err != nil {
+		return config, err
+	}
+	if config.OpenAIVideoPath, err = normalizedPath(config.OpenAIVideoPath, "/v1/videos"); err != nil {
 		return config, err
 	}
 	if config.CustomHeader == nil {
@@ -283,6 +305,15 @@ func ChannelGet(id int) (model.Channel, error) {
 		return model.Channel{}, fmt.Errorf("channel not found")
 	}
 	return channel, nil
+}
+
+// ChannelKeyGet 返回指定渠道凭据的缓存副本, 供按凭据直接构造上游请求。
+func ChannelKeyGet(id int) (model.ChannelKey, error) {
+	channelKey, ok := channelKeyCache.Get(id)
+	if !ok {
+		return model.ChannelKey{}, fmt.Errorf("channel key not found")
+	}
+	return channelKey, nil
 }
 
 // ChannelGrantGet 返回可用于转发的渠道授权, 并补齐其模型与凭据。

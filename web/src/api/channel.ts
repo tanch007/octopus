@@ -5,10 +5,16 @@ import { formatStatsMetrics, type StatsMetrics, type StatsMetricsFormatted } fro
 
 // Protocol 是渠道支持的上游线协议位掩码，位值与后端 model.Protocol 一致，不可变更。
 // 一条授权可同时支持多个协议，按位或组合；1 << 0 由后端保留待用。
+// 对话类协议之间可以互相转换，媒体类协议各自独立，没有转换伙伴。
 export const Protocol = {
     OpenAIChatCompletion: 1 << 1,
     OpenAIResponse: 1 << 2,
     AnthropicMessage: 1 << 3,
+    OpenAIEmbedding: 1 << 4,
+    OpenAISpeech: 1 << 5,
+    OpenAITranscription: 1 << 6,
+    OpenAITranslation: 1 << 7,
+    OpenAIVideo: 1 << 8,
 } as const;
 
 // Dialect 是上游在标准协议之上的方言，决定出站转换器的厂商特化配置。
@@ -65,6 +71,11 @@ export type ChannelDetail = {
     openai_chat_completion_path: string;
     openai_response_path: string;
     anthropic_message_path: string;
+    openai_embedding_path: string;
+    openai_speech_path: string;
+    openai_transcription_path: string;
+    openai_translation_path: string;
+    openai_video_path: string;
     keys: ChannelKey[];
     models: string[]; // 上游模型名称；模型除名称外没有界面用得上的字段。
     grants: ChannelGrant[];

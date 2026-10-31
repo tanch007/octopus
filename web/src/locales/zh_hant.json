@@ -465,6 +465,7 @@
             "keysRequiredFirst": "請先新增憑證",
             "detailLoading": "正在載入通道設定",
             "detailFailed": "通道設定載入失敗",
+            "grantProtocols": "協議",
             "grantExpandAll": "全部展開",
             "grantCollapseAll": "全部折疊",
             "modelAdd": "新增",

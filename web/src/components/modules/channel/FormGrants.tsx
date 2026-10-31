@@ -15,11 +15,25 @@ import { IconButton } from '@/components/common/IconButton';
 import { useModelProbe } from './probe';
 import { grantKey, type ChannelFormState } from './state';
 
-// GrantCells 渲染一行右侧固定的四格: chat, response, message 三个协议勾选和一个删除。
+// PROTOCOL_COLUMNS 是授权矩阵的协议列, 顺序即列顺序; 位值与后端 model.Protocol 一致。
+// 前三个是对话类协议, 彼此可经转换互相承接; 后五个是媒体类协议, 各自独立, 没有转换伙伴。
+// 列名用短标签, 悬停提示给出全称: 列宽只有 28px, 写不下全称。
+const PROTOCOL_COLUMNS = [
+    { bit: Protocol.OpenAIChatCompletion, label: 'chat', title: 'OpenAI Chat Completions' },
+    { bit: Protocol.OpenAIResponse, label: 'resp', title: 'OpenAI Responses' },
+    { bit: Protocol.AnthropicMessage, label: 'msg', title: 'Anthropic Messages' },
+    { bit: Protocol.OpenAIEmbedding, label: 'emb', title: 'OpenAI Embeddings' },
+    { bit: Protocol.OpenAISpeech, label: 'tts', title: 'OpenAI Speech' },
+    { bit: Protocol.OpenAITranscription, label: 'stt', title: 'OpenAI Transcription' },
+    { bit: Protocol.OpenAITranslation, label: 'trn', title: 'OpenAI Translation' },
+    { bit: Protocol.OpenAIVideo, label: 'vid', title: 'OpenAI Video' },
+];
+
+// GrantCells 渲染一行右侧固定的协议格与一个删除格。
 // 表头, 模型行, 凭据子行的差别只是这一行覆盖的 (模型 × 凭据) 范围与删除动作, 勾选,
 // 三态和写入是同一套逻辑, 故三级共用此段, 列宽与对齐也因此天然一致。
-// 三个协议列固定, 凭据作为模型的子行, 故列数不随凭据数变化。
-function GrantCells({ state, setState, models, keyNames, remove, icon: Icon, tip }: {
+// 协议列固定, 凭据作为模型的子行, 故列数不随凭据数变化。
+function GrantCells({ state, setState, models, keyNames, remove, icon: Icon, tip, header }: {
     state: ChannelFormState;
     setState: (next: ChannelFormState) => void;
     models: string[]; // 本行覆盖的模型名。
@@ -27,9 +41,11 @@ function GrantCells({ state, setState, models, keyNames, remove, icon: Icon, tip
     remove?: () => void; // 为空表示本行没有删除动作, 末格仍占位以保持列对齐。
     icon: LucideIcon; // 删除格的图标, 表头用橡皮, 模型与凭据行用垃圾桶。
     tip: string; // 删除格的提示, 三级的删除语义不同。
+    header?: boolean; // 为真时在勾选框上方给出列名, 其余行留出同样的空白以保持对齐。
 }) {
     // cell 渲染一个协议格: 覆盖范围内全部组合都开为 true, 全关为 false, 其余为半选。
-    const cell = (bit: number) => {
+    const cell = (column: (typeof PROTOCOL_COLUMNS)[number]) => {
+        const bit = column.bit;
         let on = 0;
         for (const modelName of models) {
             for (const keyName of keyNames) {
@@ -39,7 +55,9 @@ function GrantCells({ state, setState, models, keyNames, remove, icon: Icon, tip
         const total = models.length * keyNames.length;
         const value = total === 0 || on === 0 ? false : on === total ? true : 'indeterminate';
         return (
-            <span className="w-7 flex justify-center">
+            <span className="w-7 flex flex-col items-center justify-center" title={column.title}>
+                {/* 列名只出现在表头一行, 但每行都留出同样高的空白, 复选框因此在各行之间对齐。 */}
+                <span className="h-4 text-[9px] leading-4 text-muted-foreground">{header ? column.label : ''}</span>
                 <Checkbox
                     checked={value}
                     disabled={total === 0}
@@ -64,9 +82,7 @@ function GrantCells({ state, setState, models, keyNames, remove, icon: Icon, tip
 
     return (
         <>
-            {cell(Protocol.OpenAIChatCompletion)}
-            {cell(Protocol.OpenAIResponse)}
-            {cell(Protocol.AnthropicMessage)}
+            {PROTOCOL_COLUMNS.map((column) => cell(column))}
             <span className="w-7 flex justify-center">
                 {remove && (
                     <IconButton
@@ -172,8 +188,8 @@ export function FormGrants({ state, setState }: {
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-border overflow-hidden">
-                {/* 展开折叠在最左, 与下面模型行的箭头同侧; 协议标签, 三个批量勾选和清空靠右成组。
-                    标签用 ml-auto 顶到右侧, 紧挨复选框, 才能读作这三列的表头。 */}
+                {/* 展开折叠在最左, 与下面模型行的箭头同侧; 协议列名与批量勾选靠右成组。
+                    列名由协议格自己给出, 与勾选框同列同宽, 逐列对得上。 */}
                 <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-muted/30 shrink-0">
                     {/* 全部展开与全部折叠共用一个按钮: 已全展开时折叠, 否则展开全部。 */}
                     <IconButton
@@ -184,9 +200,7 @@ export function FormGrants({ state, setState }: {
                     >
                         {allExpanded ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}
                     </IconButton>
-                    <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">
-                        chat / response / message
-                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">{t('grantProtocols')}</span>
                     {/* 表头覆盖全部模型全部凭据, 故勾选即批量, 删除即清空全部模型及其授权。 */}
                     <GrantCells
                         state={state} setState={setState}
@@ -194,6 +208,7 @@ export function FormGrants({ state, setState }: {
                         remove={() => setState({ ...state, models: [], grants: new Map() })}
                         icon={Eraser}
                         tip={t('grantClearAll')}
+                        header
                     />
                 </div>
 

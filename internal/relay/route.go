@@ -64,10 +64,23 @@ func ResetRouteState(groupID int) {
 }
 
 // pickGroupItem 按分组模式选择本轮目标成员, 没有可用成员时返回零值; group.Items 已按 Priority 升序排列。
+// 成员授权未声明本请求所需的协议时不参与选路: 对话类成员只要有任一对话协议即可承接,
+// 媒体类成员必须精确声明该协议位, 否则只支持对话的渠道会被派去承接嵌入或语音请求。
 // 渠道是否可用不在此判断: 渠道禁用或缺少密钥由调用方发现并作为一轮失败上报, 该成员随即进入冷却而在后续轮次被跳过。
-func pickGroupItem(group model.Group) model.GroupItem {
+func pickGroupItem(group model.Group, mask model.Protocol) model.GroupItem {
+	items := make([]model.GroupItem, 0, len(group.Items))
+	for _, item := range group.Items {
+		if item.Protocols&mask == 0 {
+			continue
+		}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		return model.GroupItem{}
+	}
+
 	if group.Mode == model.GroupModeManual {
-		for _, item := range group.Items {
+		for _, item := range items {
 			if item.ID == group.ActiveItemID {
 				return item
 			}
@@ -85,11 +98,14 @@ func pickGroupItem(group model.Group) model.GroupItem {
 	}
 
 	// 亲和期内沿用当前成员, 不提前探测已恢复的高优先级成员。
+	// 当前成员不支持本请求的协议时亲和不适用, 退回常规选路。
 	if route.CurrentItemID != 0 && route.AffinityUntil > now {
-		return itemOf(group, route.CurrentItemID)
+		if item := itemOf(items, route.CurrentItemID); item.ID != 0 {
+			return item
+		}
 	}
 
-	for _, item := range group.Items {
+	for _, item := range items {
 		// 遍历到当前成员说明比它优先级更高的成员都不可选, 沿用当前成员。
 		if item.ID == route.CurrentItemID {
 			break
@@ -112,7 +128,7 @@ func pickGroupItem(group model.Group) model.GroupItem {
 		return item
 	}
 	if route.CurrentItemID != 0 {
-		return itemOf(group, route.CurrentItemID)
+		return itemOf(items, route.CurrentItemID)
 	}
 	return model.GroupItem{}
 }
@@ -228,9 +244,9 @@ func groupRouteLocked(group model.Group) *RouteState {
 	return route
 }
 
-// itemOf 返回分组内指定 ID 的成员, 不存在时返回零值。
-func itemOf(group model.Group, itemID int) model.GroupItem {
-	for _, item := range group.Items {
+// itemOf 返回给定成员列表内指定 ID 的成员, 不存在时返回零值。
+func itemOf(items []model.GroupItem, itemID int) model.GroupItem {
+	for _, item := range items {
 		if item.ID == itemID {
 			return item
 		}

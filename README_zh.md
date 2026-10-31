@@ -239,8 +239,52 @@ http://localhost:5173
 | OpenAI Responses | `/v1/responses` | `https://api.openai.com` | `https://api.openai.com/v1/responses` |
 | Anthropic | `/v1/messages` | `https://api.anthropic.com` | `https://api.anthropic.com/v1/messages` |
 | Gemini | `/v1beta/models/:model:generateContent` | `https://generativelanguage.googleapis.com` | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` |
+| OpenAI Embeddings | `/v1/embeddings` | `https://api.openai.com` | `https://api.openai.com/v1/embeddings` |
+| OpenAI Speech | `/v1/audio/speech` | `https://api.openai.com` | `https://api.openai.com/v1/audio/speech` |
+| OpenAI Transcription | `/v1/audio/transcriptions` | `https://api.openai.com` | `https://api.openai.com/v1/audio/transcriptions` |
+| OpenAI Translation | `/v1/audio/translations` | `https://api.openai.com` | `https://api.openai.com/v1/audio/translations` |
+| OpenAI Video | `/v1/videos` | `https://api.openai.com` | `https://api.openai.com/v1/videos` |
 
 > 💡 **提示**：Base URL 无需包含 `/v1`、`/v1beta` 或具体的 API 端点路径，程序会自动处理。
+
+**协议授权：**
+
+渠道编辑页的「模型」步骤里，每条授权（模型 × 凭据）都可以勾选该组合支持的协议：
+
+| 列 | 协议 | 说明 |
+|----|------|------|
+| `chat` | OpenAI Chat Completions | `/v1/chat/completions` |
+| `resp` | OpenAI Responses | `/v1/responses` |
+| `msg` | Anthropic Messages | `/v1/messages` |
+| `emb` | OpenAI Embeddings | `/v1/embeddings` |
+| `tts` | OpenAI Speech | `/v1/audio/speech` |
+| `stt` | OpenAI Transcription | `/v1/audio/transcriptions` |
+| `trn` | OpenAI Translation | `/v1/audio/translations` |
+| `vid` | OpenAI Video | `/v1/videos` |
+
+> 💡 **提示**：对话类三个协议之间可以互相转换，只要勾选其中任意一个即可承接对话请求；媒体类协议各自独立，没有转换伙伴，必须精确勾选对应列，否则分组不会把该成员派去承接这类请求。
+
+---
+
+### 🎬 多媒体端点
+
+除对话外，程序同时代理 OpenAI 家族的嵌入、语音与视频端点。它们与对话端点共用同一套分组、故障转移与统计机制：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/embeddings` | POST | 文本嵌入，返回向量 |
+| `/v1/audio/speech` | POST | 语音合成，返回音频二进制 |
+| `/v1/audio/transcriptions` | POST | 语音转写，接收音频文件（multipart） |
+| `/v1/audio/translations` | POST | 语音翻译，接收音频文件（multipart） |
+| `/v1/videos` | POST | 创建视频生成任务 |
+| `/v1/videos/{id}` | GET | 查询视频任务状态 |
+| `/v1/videos/{id}` | DELETE | 删除视频任务 |
+
+**处理方式：**
+
+- 请求体原样送往上游，只把其中的 `model` 换成该成员配置的真实模型名，其余字段一律不改动
+- 语音转写与翻译的多段表单会重新编码，音频文件及其内容类型保持不变
+- 视频生成是异步的：创建成功后会记录任务与承接它的渠道，之后按任务 ID 的查询与删除都会回到同一个上游
 
 ---
 
@@ -315,7 +359,39 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 ```
 
-### Claude Code
+### 多媒体端点
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:8080/v1",
+    api_key="sk-octopus-",
+)
+
+# 文本嵌入
+embedding = client.embeddings.create(model="octopus-embedding", input="hello")
+print(embedding.data[0].embedding)
+
+# 语音合成
+speech = client.audio.speech.create(
+    model="octopus-tts",
+    voice="alloy",
+    input="你好",
+)
+speech.stream_to_file("hello.mp3")
+
+# 语音转写
+with open("hello.mp3", "rb") as audio:
+    transcript = client.audio.transcriptions.create(model="octopus-stt", file=audio)
+print(transcript.text)
+
+# 视频生成（异步）
+video = client.videos.create(model="octopus-video", prompt="一只在草地上奔跑的猫")
+print(video.id)
+```
+
+---
 
 编辑 `~/.claude/settings.json`
 

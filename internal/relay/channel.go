@@ -21,6 +21,14 @@ import (
 // 地址由渠道的协议路径字段与地址拼接, 凭据取自目标绑定的渠道凭据。
 // want 是客户端请求使用的协议, 由调用方按入站格式定出; 选中的协议随请求状态推给界面, 故一并返回。
 func buildOutbound(channel model.Channel, grant model.ChannelGrant, channelKey model.ChannelKey, want model.Protocol) (transformer.Outbound, model.Protocol, bool, error) {
+	// 媒体类协议没有转换伙伴: 只能由声明了该协议位的授权承接, 出站请求由转发链路按客户端原文自行构造。
+	if want&model.ProtocolOpenAIDialogs == 0 {
+		if grant.Protocols&want == 0 {
+			return nil, 0, false, fmt.Errorf("channel grant %d does not support protocol %d", grant.ID, want)
+		}
+		return nil, want, true, nil
+	}
+
 	protocol, passthrough := want, grant.Protocols&want != 0
 	if !passthrough {
 		protocol = 0
@@ -54,8 +62,9 @@ func buildOutbound(channel model.Channel, grant model.ChannelGrant, channelKey m
 var clientHeaderPlaceholder = regexp.MustCompile(`\{client_header:[^}]+\}`)
 
 // applyChannelConfig 按渠道配置覆盖上游请求的参数并追加自定义 Header; model 与 stream 由转发流程决定, 不允许覆盖。
+// 参数覆盖只作用于 JSON 正文: 多段表单的正文是分段编码的, 按 JSON 路径改写会把正文破坏掉。
 func applyChannelConfig(channel model.Channel, request *httpclient.Request) error {
-	if channel.ParamOverride != "" {
+	if channel.ParamOverride != "" && isJSONContentType(request.ContentType) {
 		var overrides map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(channel.ParamOverride), &overrides); err != nil {
 			return fmt.Errorf("invalid channel parameter override: %w", err)

@@ -30,12 +30,22 @@ export type ChannelPreset = {
     openai_chat_completion_path: string;
     openai_response_path: string;
     anthropic_message_path: string;
+    openai_embedding_path: string;
+    openai_speech_path: string;
+    openai_transcription_path: string;
+    openai_translation_path: string;
+    openai_video_path: string;
 };
 
 // 默认协议路径, 与后端 DDL 默认值一致。
 const CHAT = '/v1/chat/completions';
 const RESP = '/v1/responses';
 const ANTH = '/v1/messages';
+const EMB = '/v1/embeddings';
+const TTS = '/v1/audio/speech';
+const STT = '/v1/audio/transcriptions';
+const TRN = '/v1/audio/translations';
+const VID = '/v1/videos';
 
 export const CHANNEL_PRESETS: ChannelPreset[] = [
     {
@@ -45,7 +55,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: '',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'openai', label: 'OpenAI', Icon: OpenAIIcon, iconClassName: 'brightness-0 dark:invert',
@@ -54,7 +64,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.openai.com',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'anthropic', label: 'Anthropic', Icon: AnthropicIcon, iconClassName: 'brightness-0 dark:invert',
@@ -63,7 +73,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.anthropic.com',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'volcengine', label: '火山方舟', Icon: VolcengineIcon,
@@ -72,7 +82,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://ark.cn-beijing.volces.com',
-        openai_chat_completion_path: '/api/v3/chat/completions', openai_response_path: '/api/v3/responses', anthropic_message_path: '/api/compatible/v1/messages',
+        openai_chat_completion_path: '/api/v3/chat/completions', openai_response_path: '/api/v3/responses', anthropic_message_path: '/api/compatible/v1/messages', openai_embedding_path: '/api/v3/embeddings', openai_speech_path: '/api/v3/audio/speech', openai_transcription_path: '/api/v3/audio/transcriptions', openai_translation_path: '/api/v3/audio/translations', openai_video_path: '/api/v3/videos',
     },
     {
         id: 'volcengine-coding-plan', label: '火山方舟 Coding Plan', Icon: VolcengineIcon,
@@ -81,7 +91,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://ark.cn-beijing.volces.com',
-        openai_chat_completion_path: '/api/coding/v3/chat/completions', openai_response_path: '/api/coding/v3/responses', anthropic_message_path: '/api/coding/v1/messages',
+        openai_chat_completion_path: '/api/coding/v3/chat/completions', openai_response_path: '/api/coding/v3/responses', anthropic_message_path: '/api/coding/v1/messages', openai_embedding_path: '/api/coding/v3/embeddings', openai_speech_path: '/api/coding/v3/audio/speech', openai_transcription_path: '/api/coding/v3/audio/transcriptions', openai_translation_path: '/api/coding/v3/audio/translations', openai_video_path: '/api/coding/v3/videos',
     },
     {
         id: 'deepseek', label: 'DeepSeek', Icon: DeepSeekIcon,
@@ -90,7 +100,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.deepseek.com',
-        openai_chat_completion_path: '/chat/completions', openai_response_path: '/responses', anthropic_message_path: '/anthropic/v1/messages',
+        openai_chat_completion_path: '/chat/completions', openai_response_path: '/responses', anthropic_message_path: '/anthropic/v1/messages', openai_embedding_path: '/embeddings', openai_speech_path: '/audio/speech', openai_transcription_path: '/audio/transcriptions', openai_translation_path: '/audio/translations', openai_video_path: '/videos',
     },
     {
         id: 'openrouter', label: 'OpenRouter', Icon: OpenRouterIcon, iconClassName: 'brightness-0 dark:invert',
@@ -99,7 +109,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://openrouter.ai/api',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'groq', label: 'Groq', Icon: GroqIcon,
@@ -108,7 +118,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.groq.com/openai',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'dashscope', label: '通义千问', Icon: QwenIcon, iconClassName: 'brightness-0 dark:invert',
@@ -117,7 +127,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://dashscope.aliyuncs.com',
-        openai_chat_completion_path: '/compatible-mode/v1/chat/completions', openai_response_path: '/compatible-mode/v1/responses', anthropic_message_path: '/apps/anthropic/v1/messages',
+        openai_chat_completion_path: '/compatible-mode/v1/chat/completions', openai_response_path: '/compatible-mode/v1/responses', anthropic_message_path: '/apps/anthropic/v1/messages', openai_embedding_path: '/compatible-mode/v1/embeddings', openai_speech_path: '/compatible-mode/v1/audio/speech', openai_transcription_path: '/compatible-mode/v1/audio/transcriptions', openai_translation_path: '/compatible-mode/v1/audio/translations', openai_video_path: '/compatible-mode/v1/videos',
     },
     {
         id: 'qwen-token-plan', label: '通义千问 Token Plan', Icon: QwenIcon, iconClassName: 'brightness-0 dark:invert',
@@ -126,7 +136,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://token-plan.maas.qianwenaiapi.com',
-        openai_chat_completion_path: '/compatible-mode/v1/chat/completions', openai_response_path: '/compatible-mode/v1/responses', anthropic_message_path: '/apps/anthropic/v1/messages',
+        openai_chat_completion_path: '/compatible-mode/v1/chat/completions', openai_response_path: '/compatible-mode/v1/responses', anthropic_message_path: '/apps/anthropic/v1/messages', openai_embedding_path: '/compatible-mode/v1/embeddings', openai_speech_path: '/compatible-mode/v1/audio/speech', openai_transcription_path: '/compatible-mode/v1/audio/transcriptions', openai_translation_path: '/compatible-mode/v1/audio/translations', openai_video_path: '/compatible-mode/v1/videos',
     },
     {
         id: 'moonshot', label: 'Moonshot', Icon: MoonshotIcon, iconClassName: 'brightness-0 dark:invert',
@@ -135,7 +145,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.moonshot.cn',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: '/anthropic/v1/messages',
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: '/anthropic/v1/messages', openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'kimi-code', label: 'Kimi Code', Icon: MoonshotIcon, iconClassName: 'brightness-0 dark:invert',
@@ -144,7 +154,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.kimi.com',
-        openai_chat_completion_path: '/coding/v1/chat/completions', openai_response_path: '/coding/v1/responses', anthropic_message_path: '/coding/v1/messages',
+        openai_chat_completion_path: '/coding/v1/chat/completions', openai_response_path: '/coding/v1/responses', anthropic_message_path: '/coding/v1/messages', openai_embedding_path: '/coding/v1/embeddings', openai_speech_path: '/coding/v1/audio/speech', openai_transcription_path: '/coding/v1/audio/transcriptions', openai_translation_path: '/coding/v1/audio/translations', openai_video_path: '/coding/v1/videos',
     },
     {
         id: 'zhipu', label: '智谱 GLM', Icon: ZhipuIcon,
@@ -153,7 +163,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://open.bigmodel.cn',
-        openai_chat_completion_path: '/api/paas/v4/chat/completions', openai_response_path: '/api/v1/responses', anthropic_message_path: '/api/anthropic/v1/messages',
+        openai_chat_completion_path: '/api/paas/v4/chat/completions', openai_response_path: '/api/v1/responses', anthropic_message_path: '/api/anthropic/v1/messages', openai_embedding_path: '/api/paas/v4/embeddings', openai_speech_path: '/api/paas/v4/audio/speech', openai_transcription_path: '/api/paas/v4/audio/transcriptions', openai_translation_path: '/api/paas/v4/audio/translations', openai_video_path: '/api/paas/v4/videos',
     },
     {
         id: 'glm-coding-plan', label: '智谱 GLM Coding Plan', Icon: ZhipuIcon,
@@ -162,7 +172,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://open.bigmodel.cn',
-        openai_chat_completion_path: '/api/coding/paas/v4/chat/completions', openai_response_path: '/api/v1/responses', anthropic_message_path: '/api/anthropic/v1/messages',
+        openai_chat_completion_path: '/api/coding/paas/v4/chat/completions', openai_response_path: '/api/v1/responses', anthropic_message_path: '/api/anthropic/v1/messages', openai_embedding_path: '/api/coding/paas/v4/embeddings', openai_speech_path: '/api/coding/paas/v4/audio/speech', openai_transcription_path: '/api/coding/paas/v4/audio/transcriptions', openai_translation_path: '/api/coding/paas/v4/audio/translations', openai_video_path: '/api/coding/paas/v4/videos',
     },
     {
         id: 'xai', label: 'xAI', Icon: XAIIcon, iconClassName: 'brightness-0 dark:invert',
@@ -171,7 +181,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.x.ai',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'siliconflow', label: 'SiliconFlow', Icon: SiliconFlowIcon,
@@ -180,7 +190,7 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: 'https://api.siliconflow.cn',
-        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH,
+        openai_chat_completion_path: CHAT, openai_response_path: RESP, anthropic_message_path: ANTH, openai_embedding_path: EMB, openai_speech_path: TTS, openai_transcription_path: STT, openai_translation_path: TRN, openai_video_path: VID,
     },
     {
         id: 'azure', label: 'Azure OpenAI', Icon: AzureIcon,
@@ -189,6 +199,6 @@ export const CHANNEL_PRESETS: ChannelPreset[] = [
         },
         dialect: 'generic',
         base_url: '',
-        openai_chat_completion_path: '/openai/v1/chat/completions', openai_response_path: '/openai/v1/responses', anthropic_message_path: ANTH,
+        openai_chat_completion_path: '/openai/v1/chat/completions', openai_response_path: '/openai/v1/responses', anthropic_message_path: ANTH, openai_embedding_path: '/openai/v1/embeddings', openai_speech_path: '/openai/v1/audio/speech', openai_transcription_path: '/openai/v1/audio/transcriptions', openai_translation_path: '/openai/v1/audio/translations', openai_video_path: '/openai/v1/videos',
     },
 ];

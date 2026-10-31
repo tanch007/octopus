@@ -11,6 +11,11 @@ export type ChannelFormState = {
     openai_chat_completion_path: string;
     openai_response_path: string;
     anthropic_message_path: string;
+    openai_embedding_path: string;
+    openai_speech_path: string;
+    openai_transcription_path: string;
+    openai_translation_path: string;
+    openai_video_path: string;
     keys: { name: string; key: string; enabled: boolean }[];
     models: string[];
     grants: Map<string, number>; // 键为 grantKey(模型名, 凭据名), 值为 Protocol 位掩码。
@@ -34,6 +39,11 @@ export const emptyFormState: ChannelFormState = {
     openai_chat_completion_path: '/v1/chat/completions',
     openai_response_path: '/v1/responses',
     anthropic_message_path: '/v1/messages',
+    openai_embedding_path: '/v1/embeddings',
+    openai_speech_path: '/v1/audio/speech',
+    openai_transcription_path: '/v1/audio/transcriptions',
+    openai_translation_path: '/v1/audio/translations',
+    openai_video_path: '/v1/videos',
     keys: [],
     models: [],
     grants: new Map(),
@@ -54,6 +64,11 @@ export function fromChannel(channel: ChannelDetail): ChannelFormState {
         openai_chat_completion_path: channel.openai_chat_completion_path,
         openai_response_path: channel.openai_response_path,
         anthropic_message_path: channel.anthropic_message_path,
+        openai_embedding_path: channel.openai_embedding_path,
+        openai_speech_path: channel.openai_speech_path,
+        openai_transcription_path: channel.openai_transcription_path,
+        openai_translation_path: channel.openai_translation_path,
+        openai_video_path: channel.openai_video_path,
         keys: channel.keys.map(({ name, key, enabled }) => ({ name, key, enabled })),
         models: [...channel.models],
         grants: new Map(channel.grants.map((g) => [grantKey(g.model_name, g.key_name), g.protocols])),
@@ -75,6 +90,11 @@ export function toChannelConfig(state: ChannelFormState) {
         openai_chat_completion_path: state.openai_chat_completion_path.trim(),
         openai_response_path: state.openai_response_path.trim(),
         anthropic_message_path: state.anthropic_message_path.trim(),
+        openai_embedding_path: state.openai_embedding_path.trim(),
+        openai_speech_path: state.openai_speech_path.trim(),
+        openai_transcription_path: state.openai_transcription_path.trim(),
+        openai_translation_path: state.openai_translation_path.trim(),
+        openai_video_path: state.openai_video_path.trim(),
         proxy: state.proxy,
         custom_header: state.custom_header.filter((h) => h.header_key.trim() && h.header_value !== ''),
         channel_proxy: state.channel_proxy.trim(),

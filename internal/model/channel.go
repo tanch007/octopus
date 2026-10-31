@@ -1,14 +1,25 @@
 package model
 
 // 渠道支持的上游线协议, 以位掩码存储, 一条渠道授权可同时支持多个协议。
-type Protocol uint8
+type Protocol uint16
 
 // 协议位从 1 << 1 开始, 1 << 0 保留待用; 位值会落库并与前端交互, 不可再变更。
 const (
 	ProtocolOpenAIChatCompletion Protocol = 1 << 1 // OpenAI Chat Completions 协议。
 	ProtocolOpenAIResponse       Protocol = 1 << 2 // OpenAI Responses 协议。
 	ProtocolAnthropicMessage     Protocol = 1 << 3 // Anthropic Messages 协议。
+	// 以下是 OpenAI 家族的非对话协议: 各自是独立的请求族, 与对话协议之间无转换关系,
+	// 故各自占一位, 授权只声明该组合支持其中哪几个。
+	ProtocolOpenAIEmbedding     Protocol = 1 << 4 // OpenAI Embeddings 协议。
+	ProtocolOpenAISpeech        Protocol = 1 << 5 // OpenAI 语音合成协议。
+	ProtocolOpenAITranscription Protocol = 1 << 6 // OpenAI 语音转写协议。
+	ProtocolOpenAITranslation   Protocol = 1 << 7 // OpenAI 语音翻译协议。
+	ProtocolOpenAIVideo         Protocol = 1 << 8 // OpenAI 视频生成协议。
 )
+
+// ProtocolOpenAIDialogs 是对话类协议的集合: 三者之间可经转换互相承接,
+// 故同一授权只要声明其中之一即可服务对话请求。
+const ProtocolOpenAIDialogs = ProtocolOpenAIChatCompletion | ProtocolOpenAIResponse | ProtocolAnthropicMessage
 
 // 上游在标准协议之上的方言。
 // 同一协议下不同服务商仍可能有请求体或响应体上的差异, 例如思考内容放 reasoning_content 还是 reasoning,
@@ -33,6 +44,11 @@ type ChannelConfig struct {
 	OpenAIChatCompletionPath string         `json:"openai_chat_completion_path" gorm:"column:openai_chat_completion_path;default:/v1/chat/completions"` // OpenAI Chat Completions 请求路径; 留空由后端填默认路径。
 	OpenAIResponsePath       string         `json:"openai_response_path" gorm:"column:openai_response_path;default:/v1/responses"`                      // OpenAI Responses 请求路径; 留空由后端填默认路径。
 	AnthropicMessagePath     string         `json:"anthropic_message_path" gorm:"column:anthropic_message_path;default:/v1/messages"`                   // Anthropic Messages 请求路径; 留空由后端填默认路径。
+	OpenAIEmbeddingPath      string         `json:"openai_embedding_path" gorm:"column:openai_embedding_path;default:/v1/embeddings"`                   // OpenAI Embeddings 请求路径; 留空由后端填默认路径。
+	OpenAISpeechPath         string         `json:"openai_speech_path" gorm:"column:openai_speech_path;default:/v1/audio/speech"`                       // OpenAI 语音合成请求路径; 留空由后端填默认路径。
+	OpenAITranscriptionPath  string         `json:"openai_transcription_path" gorm:"column:openai_transcription_path;default:/v1/audio/transcriptions"` // OpenAI 语音转写请求路径; 留空由后端填默认路径。
+	OpenAITranslationPath    string         `json:"openai_translation_path" gorm:"column:openai_translation_path;default:/v1/audio/translations"`       // OpenAI 语音翻译请求路径; 留空由后端填默认路径。
+	OpenAIVideoPath          string         `json:"openai_video_path" gorm:"column:openai_video_path;default:/v1/videos"`                               // OpenAI 视频生成请求路径; 留空由后端填默认路径。
 	Proxy                    bool           `json:"proxy" gorm:"default:false"`                                                                         // 是否使用代理。
 	ChannelProxy             string         `json:"channel_proxy"`                                                                                      // 渠道专用代理地址; 留空表示不用渠道专用代理。
 	CustomHeader             []CustomHeader `json:"custom_header" gorm:"serializer:json"`                                                               // 追加到上游请求的 Header。

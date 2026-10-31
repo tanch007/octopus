@@ -69,8 +69,16 @@ function ChannelFormFields({ channel, onBack }: { channel?: ChannelDetail; onBac
     // 后端会拒的四项在此先挡: 名称与地址非空, 路径以 / 开头, 至少一份填了 Key 的凭据, 至少一个模型。
     const canSubmit = state.name.trim() !== ''
         && state.base_url.trim() !== ''
-        && [state.openai_chat_completion_path, state.openai_response_path, state.anthropic_message_path]
-            .every((path) => path === '' || path.startsWith('/'))
+        && [
+            state.openai_chat_completion_path,
+            state.openai_response_path,
+            state.anthropic_message_path,
+            state.openai_embedding_path,
+            state.openai_speech_path,
+            state.openai_transcription_path,
+            state.openai_translation_path,
+            state.openai_video_path,
+        ].every((path) => path === '' || path.startsWith('/'))
         && state.keys.length > 0
         && state.keys.every((k) => k.key.trim() !== '')
         && state.models.length > 0;
@@ -92,6 +100,11 @@ function ChannelFormFields({ channel, onBack }: { channel?: ChannelDetail; onBac
             openai_chat_completion_path: preset.openai_chat_completion_path,
             openai_response_path: preset.openai_response_path,
             anthropic_message_path: preset.anthropic_message_path,
+            openai_embedding_path: preset.openai_embedding_path,
+            openai_speech_path: preset.openai_speech_path,
+            openai_transcription_path: preset.openai_transcription_path,
+            openai_translation_path: preset.openai_translation_path,
+            openai_video_path: preset.openai_video_path,
         });
         setStep('connection');
     };
@@ -187,22 +200,30 @@ function ChannelFormFields({ channel, onBack }: { channel?: ChannelDetail; onBac
                                     required
                                 />
                             </div>
-                            {([
-                                ['openai_chat_completion_path', 'OpenAI Chat'],
-                                ['openai_response_path', 'OpenAI Responses'],
-                                ['anthropic_message_path', 'Anthropic'],
-                            ] as const).map(([field, label]) => (
-                                <div key={field} className="space-y-2">
-                                    <Label htmlFor={`${idPrefix}-${field}`}>{label}</Label>
-                                    <Input
-                                        id={`${idPrefix}-${field}`}
-                                        value={state[field]}
-                                        onChange={(e) => setState({ ...state, [field]: e.target.value })}
-                                        aria-invalid={state[field] !== '' && !state[field].startsWith('/')}
-                                        className="rounded-xl font-mono text-sm"
-                                    />
-                                </div>
-                            ))}
+                            {/* 八个协议路径两列排布: 逐个单列会把连接步骤撑得过长, 两列仍逐项对齐可读。 */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {([
+                                    ['openai_chat_completion_path', 'OpenAI Chat'],
+                                    ['openai_response_path', 'OpenAI Responses'],
+                                    ['anthropic_message_path', 'Anthropic'],
+                                    ['openai_embedding_path', 'OpenAI Embeddings'],
+                                    ['openai_speech_path', 'OpenAI Speech'],
+                                    ['openai_transcription_path', 'OpenAI Transcription'],
+                                    ['openai_translation_path', 'OpenAI Translation'],
+                                    ['openai_video_path', 'OpenAI Video'],
+                                ] as const).map(([field, label]) => (
+                                    <div key={field} className="space-y-2">
+                                        <Label htmlFor={`${idPrefix}-${field}`}>{label}</Label>
+                                        <Input
+                                            id={`${idPrefix}-${field}`}
+                                            value={state[field]}
+                                            onChange={(e) => setState({ ...state, [field]: e.target.value })}
+                                            aria-invalid={state[field] !== '' && !state[field].startsWith('/')}
+                                            className="rounded-xl font-mono text-sm"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                             <div className="flex flex-wrap items-center gap-6">
                                 {([['enabled', t('enabled')], ['proxy', t('proxy')]] as const).map(([field, label]) => (
                                     <label key={field} className="flex items-center gap-2 cursor-pointer">

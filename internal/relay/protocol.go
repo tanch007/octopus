@@ -15,6 +15,7 @@ import (
 	"github.com/looplj/axonhub/llm/transformer/anthropic"
 	"github.com/looplj/axonhub/llm/transformer/openai"
 	"github.com/looplj/axonhub/llm/transformer/openai/responses"
+	"github.com/tidwall/gjson"
 )
 
 // buildPassthroughRequest 构造同协议透传的上游请求: 目标地址, 认证和请求体由渠道决定, 客户端的其余请求头和查询参数
@@ -61,11 +62,38 @@ func buildPassthroughRequest(format llm.APIFormat, raw *httpclient.Request, chan
 // inspectStreamEvent 判断一个客户端协议流事件是否结束了整个响应流, 并识别以事件形式下发的上游错误。
 // 返回 true 表示流已结束; 返回的 error 非空表示该事件本身即失败, 本轮不可提交。
 func inspectStreamEvent(format llm.APIFormat, event *httpclient.StreamEvent) (bool, error) {
-	if event == nil || len(event.Data) == 0 {
+	if event == nil {
+		return false, nil
+	}
+	// 二进制分块流的结束标记没有正文, 单独识别。
+	if event.Type == httpclient.BinaryStreamDoneEventType {
+		return true, nil
+	}
+	if len(event.Data) == 0 {
 		return false, nil
 	}
 
 	switch format {
+	case llm.APIFormatOpenAISpeech:
+		// 语音合成的流式事件以 speech.audio.done 收尾, 部分上游另发 [DONE]。
+		if bytes.Equal(event.Data, llm.DoneStreamEvent.Data) {
+			return true, nil
+		}
+		if event.Type == "speech.audio.done" {
+			return true, nil
+		}
+		return false, mediaStreamError(event)
+
+	case llm.APIFormatOpenAITranscription, llm.APIFormatOpenAITranslation:
+		// 语音转写与翻译的流式事件以 transcript.text.done 收尾, 部分上游另发 [DONE]。
+		if bytes.Equal(event.Data, llm.DoneStreamEvent.Data) {
+			return true, nil
+		}
+		if event.Type == "transcript.text.done" {
+			return true, nil
+		}
+		return false, mediaStreamError(event)
+
 	case llm.APIFormatOpenAIChatCompletion:
 		if bytes.Equal(event.Data, llm.DoneStreamEvent.Data) {
 			return true, nil
@@ -149,6 +177,22 @@ func inspectStreamEvent(format llm.APIFormat, event *httpclient.StreamEvent) (bo
 	default:
 		return false, nil
 	}
+}
+
+// mediaStreamError 识别媒体类流事件中夹带的上游错误; 没有错误时返回 nil。
+func mediaStreamError(event *httpclient.StreamEvent) error {
+	if event.Type == "error" {
+		return &llm.ResponseError{Detail: llm.ErrorDetail{Message: "upstream stream error", Type: "stream_error"}}
+	}
+	message := gjson.GetBytes(event.Data, "error.message").String()
+	if message == "" {
+		return nil
+	}
+	return &llm.ResponseError{Detail: llm.ErrorDetail{
+		Message: message,
+		Type:    gjson.GetBytes(event.Data, "error.type").String(),
+		Code:    gjson.GetBytes(event.Data, "error.code").String(),
+	}}
 }
 
 // validateResponse 检查统一响应中需要在提交前判定为失败的终止原因; 仅 Responses 协议会以正常响应下发这类终态。

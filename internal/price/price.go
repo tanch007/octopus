@@ -19,7 +19,7 @@ const llmPriceUrl = "https://models.dev/api.json"
 
 // developerFamilies 定义研发商及其自研模型系列前缀。
 var developerFamilies = map[string][]string{
-	"openai":     {"gpt", "o"},
+	"openai":     {"gpt", "o", "text-embedding"},
 	"anthropic":  {"claude"},
 	"google":     {"gemini", "gemma", "lyria", "veo"},
 	"deepseek":   {"deepseek"},
@@ -107,8 +107,8 @@ func UpdateLLMPrice(ctx context.Context) error {
 			modelID := strings.ToLower(priceModel.ID)
 			modelFamily := strings.ToLower(priceModel.Family)
 
-			// 仅保留包含文本输出的非嵌入模型。
-			if modelID == "" || !slices.Contains(priceModel.Modalities.Output, "text") || strings.Contains(modelID, "embed") || strings.Contains(modelFamily, "embed") {
+			// 仅保留能输出文本的模型: 嵌入模型的输出同样是文本形态的向量, 按输入计费, 故一并纳入价格表。
+			if modelID == "" || !slices.Contains(priceModel.Modalities.Output, "text") {
 				continue
 			}
 

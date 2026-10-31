@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -17,33 +18,19 @@ import (
 	"github.com/looplj/axonhub/llm"
 	"github.com/looplj/axonhub/llm/httpclient"
 	"github.com/looplj/axonhub/llm/transformer"
-	"github.com/looplj/axonhub/llm/transformer/anthropic"
-	"github.com/looplj/axonhub/llm/transformer/openai"
-	"github.com/looplj/axonhub/llm/transformer/openai/responses"
 	"github.com/tidwall/sjson"
 )
 
 // Forward 按客户端协议承载一个请求的完整转发过程: 解析请求, 定位分组, 循环选目标请求上游, 直至提交响应或请求结束。
 func Forward(format llm.APIFormat) gin.HandlerFunc {
-	// 客户端协议同时定出入站转换器和请求协议位: 后者随请求状态推给界面, 也是每轮选择上游协议的首选。
-	var inbound transformer.Inbound
-	requestProtocol := model.ProtocolOpenAIChatCompletion
-	switch format {
-	case llm.APIFormatOpenAIResponse:
-		inbound = responses.NewInboundTransformer()
-		requestProtocol = model.ProtocolOpenAIResponse
-	case llm.APIFormatAnthropicMessage:
-		inbound = anthropic.NewInboundTransformer()
-		requestProtocol = model.ProtocolAnthropicMessage
-	default:
-		inbound = openai.NewInboundTransformer()
-	}
+	// 客户端协议同时定出入站转换器, 请求协议位与选路所需的协议位集合: 后者随请求状态推给界面, 也是每轮选择上游的首选。
+	spec := protocolSpecOf(format)
 
 	return func(c *gin.Context) {
 		// 完整读取客户端请求, 正文先登记到请求状态, 后续每轮直接改写为当前目标请求。
 		raw, err := httpclient.ReadHTTPRequest(c.Request)
 		if err != nil {
-			rejectRequest(c, inbound, err)
+			rejectRequest(c, spec.inbound, err)
 			return
 		}
 
@@ -52,15 +39,36 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 			Model     string `json:"model"`  // 客户端请求的分组名称。
 			Streaming bool   `json:"stream"` // 客户端是否请求流式响应。
 		}
-		if err := json.Unmarshal(raw.Body, &metadata); err != nil {
-			rejectRequest(c, inbound, err)
-			return
+		reasoningEffort := ""
+		mediaStreamFormat := ""
+		if spec.media {
+			// 媒体类请求没有统一的 JSON 请求体: 语音合成与视频是 JSON, 语音转写与翻译是多段表单,
+			// 故交由入站转换器解析并校验, 由它给出模型名称与流式标记。
+			parsed, parseErr := spec.inbound.TransformRequest(c.Request.Context(), raw)
+			if parseErr != nil {
+				rejectRequest(c, spec.inbound, parseErr)
+				return
+			}
+			metadata.Model = parsed.Model
+			metadata.Streaming = parsed.Stream != nil && *parsed.Stream
+			if parsed.Speech != nil {
+				mediaStreamFormat = parsed.Speech.StreamFormat
+			}
+		} else {
+			if err := json.Unmarshal(raw.Body, &metadata); err != nil {
+				rejectRequest(c, spec.inbound, err)
+				return
+			}
+			// 入站转换器统一解析各协议的思考等级; 解析失败仍由原有转发流程处理请求。
+			if parsed, parseErr := spec.inbound.TransformRequest(c.Request.Context(), raw); parseErr == nil {
+				reasoningEffort = parsed.ReasoningEffort
+			}
 		}
 
 		// API Key 限定了模型范围时只放行范围内的模型, 为空表示不限制。
 		if allowed, ok := c.Get("supported_models"); ok {
 			if names, _ := allowed.([]string); len(names) > 0 && !slices.Contains(names, metadata.Model) {
-				rejectRequest(c, inbound, errors.New("model not supported by this api key"))
+				rejectRequest(c, spec.inbound, errors.New("model not supported by this api key"))
 				return
 			}
 		}
@@ -69,20 +77,34 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 		// 分组主键随请求状态一并登记, 界面由此可直接按主键取分组而不必按名称回查。
 		group, err := op.GroupGetByName(metadata.Model)
 		if err != nil {
-			rejectRequest(c, inbound, errors.New("model not found"))
+			rejectRequest(c, spec.inbound, errors.New("model not found"))
 			return
 		}
 
 		// 登记进程内请求状态, 返回的记录是后续全部状态写入和前端可视化推送的入口。
-		// 入站转换器统一解析各协议的思考等级; 解析失败仍由原有转发流程处理请求。
-		reasoningEffort := ""
-		if parsed, parseErr := inbound.TransformRequest(c.Request.Context(), raw); parseErr == nil {
-			reasoningEffort = parsed.ReasoningEffort
+		// 语音转写与翻译的正文是音频文件, 入站转换器已给出可读的 JSON 替身, 日志里用它代替二进制原文。
+		loggedBody := string(raw.Body)
+		if len(raw.JSONBody) > 0 {
+			loggedBody = string(raw.JSONBody)
 		}
-		request := newRequestState(c.Request.Context(), metadata.Model, reasoningEffort, group.ID, requestProtocol, string(raw.Body), c.GetInt("api_key_id"))
+		request := newRequestState(c.Request.Context(), metadata.Model, reasoningEffort, group.ID, spec.protocol, loggedBody, c.GetInt("api_key_id"))
 		ctx := request.requestCtx
 		failedItemID := 0 // 当前累计连续失败次数的成员 ID。
 		failures := 0     // 该成员包含首次请求的连续失败次数。
+		// 媒体类请求体在每轮按本轮目标重写, 故保存客户端原文以便反复使用。
+		clientBody := slices.Clone(raw.Body)
+		// 向上游声明可接受的响应类型: 语音合成返回音频二进制, 其余端点返回 JSON;
+		// 流式请求另按事件流声明, 但语音合成的二进制分块流不是事件流, 由 stream_format 决定。
+		mediaAccept := "application/json"
+		if spec.protocol == model.ProtocolOpenAISpeech {
+			mediaAccept = "*/*"
+		}
+		if metadata.Streaming {
+			mediaAccept = "text/event-stream"
+			if spec.protocol == model.ProtocolOpenAISpeech && mediaStreamFormat != "" && mediaStreamFormat != "sse" {
+				mediaAccept = "*/*"
+			}
+		}
 
 		for {
 			if ctx.Err() != nil {
@@ -101,7 +123,7 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 
 			// 手动模式取人工指定的成员, 故障转移模式按优先级选择未禁用且不在冷却中的成员。
 			// 没有目标时等待重新选择, 期间人工切换渠道, 补齐成员或成员冷却到期即可让请求继续。
-			item := pickGroupItem(group)
+			item := pickGroupItem(group, spec.mask)
 			if item.ID == 0 {
 				if !request.wait(ctx, group.RelayConfig.MemberRetryIntervalSeconds) {
 					return
@@ -131,25 +153,27 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 			}
 
 			// 将分组成员配置的真实模型写入本轮上游请求。
-			raw.Body, err = sjson.SetBytes(raw.Body, "model", channelModel.Name)
+			// 对话类只改写 JSON 正文里的模型名称; 媒体类沿用客户端原文并只替换其中的模型字段。
+			upstreamBody, upstreamContentType, err := buildUpstreamBody(spec, raw, clientBody, channelModel.Name)
 			if err != nil {
 				request.markFailed(err, "", nil)
-				rejectRequest(c, inbound, err)
+				rejectRequest(c, spec.inbound, err)
 				return
 			}
+			raw.Body = upstreamBody
 			// OpenAI Chat 流式响应需显式要求上游在末尾附带用量。
-			if metadata.Streaming && format == llm.APIFormatOpenAIChatCompletion {
+			if metadata.Streaming && spec.format == llm.APIFormatOpenAIChatCompletion {
 				raw.Body, err = sjson.SetBytes(raw.Body, "stream_options.include_usage", true)
 				if err != nil {
 					request.markFailed(err, "", nil)
-					rejectRequest(c, inbound, err)
+					rejectRequest(c, spec.inbound, err)
 					return
 				}
 			}
 
 			// 在渠道授权支持的协议内选出本轮上游协议, 按该协议的路径与授权绑定的凭据构造出站转换器。
 			// 先于登记本轮目标: 选中的协议是本轮目标的一部分, 需与渠道和模型一并推给界面。
-			outbound, targetProtocol, passthrough, err := buildOutbound(channel, grant, *channelKey, requestProtocol)
+			outbound, targetProtocol, passthrough, err := buildOutbound(channel, grant, *channelKey, spec.protocol)
 
 			// 为本轮上游调用建立独立取消入口并登记当前目标; 取消原因用于区分人工中止与响应超时。
 			roundCtx, cancelRoundCause := context.WithCancelCause(ctx)
@@ -175,11 +199,14 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 				timeoutTimer := time.AfterFunc(time.Duration(timeoutSeconds)*time.Second, func() {
 					cancelRoundCause(timeoutErr)
 				})
-				// 客户端与渠道协议一致时直接透传, 其余组合通过 pipeline 转换。
-				if passthrough {
-					result, err = sendPassthrough(roundCtx, format, raw, channel, outbound, metadata.Streaming, channelModel.Name)
-				} else {
-					result, err = sendConverted(roundCtx, format, raw, channel, outbound, metadata.Streaming)
+				// 客户端与渠道协议一致时直接透传, 其余组合通过 pipeline 转换; 媒体类协议没有转换伙伴, 一律按原文请求。
+				switch {
+				case spec.media:
+					result, err = sendMedia(roundCtx, spec, channel, *channelKey, upstreamBody, upstreamContentType, mediaAccept, metadata.Streaming)
+				case passthrough:
+					result, err = sendPassthrough(roundCtx, spec.format, raw, channel, outbound, metadata.Streaming, channelModel.Name)
+				default:
+					result, err = sendConverted(roundCtx, spec.format, raw, channel, outbound, metadata.Streaming)
 				}
 				// 上游调用返回即结束首响应等待; Stop 失败说明已到期, 主动取消可避免等待异步回调完成。
 				if !timeoutTimer.Stop() {
@@ -256,6 +283,10 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 				if c.Writer.Header().Get("Content-Type") == "" {
 					c.Header("Content-Type", "application/json")
 				}
+				// 视频任务是异步的: 先登记任务与承接它的上游成员, 之后的查询与删除才能回到同一个上游。
+				if spec.protocol == model.ProtocolOpenAIVideo {
+					recordVideoTask(metadata.Model, channel, channelModel, *channelKey, c.GetInt("api_key_id"), result.body, ctx)
+				}
 				// 非流式响应已有完整用量, 本轮渠道和成员统计可在提交前一次完成。
 				metrics := usageMetrics(channelModel.Name, result.usage)
 				metrics.WaitTime = roundWaitTime
@@ -268,15 +299,20 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 				if err == nil && n != len(result.body) {
 					err = io.ErrShortWrite
 				}
+				// 语音合成的响应是音频二进制, 不适合整段留在日志里, 只记下字节数。
+				loggedResponse := string(result.body)
+				if spec.protocol == model.ProtocolOpenAISpeech {
+					loggedResponse = fmt.Sprintf("<audio bytes: %d>", len(result.body))
+				}
 				if err != nil {
 					if ctx.Err() != nil {
-						request.markCanceled(ctx.Err(), string(result.body), result.usage)
+						request.markCanceled(ctx.Err(), loggedResponse, result.usage)
 					} else {
-						request.markFailed(err, string(result.body), result.usage)
+						request.markFailed(err, loggedResponse, result.usage)
 					}
 					return
 				}
-				request.markSucceeded(string(result.body), result.usage)
+				request.markSucceeded(loggedResponse, result.usage)
 				return
 			}
 
@@ -296,16 +332,25 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 					// 每个事件计一个输出字符供日志页展示, 按节流间隔发布。
 					request.addOutput()
 					encoded.Reset()
-					if encodeErr := sse.Encode(&encoded, sse.Event{Id: event.LastEventID, Event: event.Type, Data: event.Data}); encodeErr != nil {
-						err = encodeErr
-						break
+					// 二进制分块流的事件正文是音频字节, 原样写出即可, 不套 SSE 帧; 其结束标记没有正文, 不写给客户端。
+					binary := event.IsBinaryAudioChunk()
+					terminal := event.Type == httpclient.BinaryStreamDoneEventType
+					if !binary && !terminal {
+						if encodeErr := sse.Encode(&encoded, sse.Event{Id: event.LastEventID, Event: event.Type, Data: event.Data}); encodeErr != nil {
+							err = encodeErr
+							break
+						}
 					}
 					if !committed {
 						request.markCommitted(true)
 						committed = true
 					}
-					n, writeErr := c.Writer.Write(encoded.Bytes())
-					if writeErr == nil && n != encoded.Len() {
+					payload := encoded.Bytes()
+					if binary {
+						payload = event.Data
+					}
+					n, writeErr := c.Writer.Write(payload)
+					if writeErr == nil && n != len(payload) {
 						writeErr = io.ErrShortWrite
 					}
 					if writeErr != nil {
@@ -323,7 +368,7 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 				}
 				event = result.events.Current()
 				// 已提交的响应不能再换目标重试, 结束事件自身携带的失败原样转发给客户端, 并在转发后作为本请求终态。
-				last, err = inspectStreamEvent(format, event)
+				last, err = inspectStreamEvent(spec.format, event)
 			}
 			request.finishStream()
 			result.events.Close()
@@ -333,7 +378,7 @@ func Forward(format llm.APIFormat) gin.HandlerFunc {
 			}
 			cancelRound()
 			// 使用客户端协议转换器聚合已转发事件, 统一取得最终响应正文和用量。
-			responseBody, meta, aggregateErr := inbound.AggregateStreamChunks(context.WithoutCancel(ctx), chunks)
+			responseBody, meta, aggregateErr := spec.inbound.AggregateStreamChunks(context.WithoutCancel(ctx), chunks)
 			if aggregateErr == nil {
 				result.usage = meta.Usage
 			}

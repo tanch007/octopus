@@ -35,11 +35,16 @@ const defaultRelayConfig: GroupRelayConfig = {
 };
 
 // PROTOCOL_TAGS 是凭据行上的协议标识。
-// 此处写全称: 凭据行只有名称一列, 横向有余量; 渠道表单的授权矩阵是三列复选框, 列宽紧张才用缩写。
+// 此处写全称: 凭据行只有名称一列, 横向有余量; 渠道表单的授权矩阵是八列复选框, 列宽紧张才用缩写。
 const PROTOCOL_TAGS = [
     { bit: Protocol.OpenAIChatCompletion, label: 'Chat' },
     { bit: Protocol.OpenAIResponse, label: 'Response' },
     { bit: Protocol.AnthropicMessage, label: 'Message' },
+    { bit: Protocol.OpenAIEmbedding, label: 'Embedding' },
+    { bit: Protocol.OpenAISpeech, label: 'Speech' },
+    { bit: Protocol.OpenAITranscription, label: 'Transcription' },
+    { bit: Protocol.OpenAITranslation, label: 'Translation' },
+    { bit: Protocol.OpenAIVideo, label: 'Video' },
 ];
 
 // FieldHelp 渲染配置字段的简短帮助提示。

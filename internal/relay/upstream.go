@@ -307,6 +307,106 @@ func (m *conversionMiddleware) OnOutboundLlmResponse(_ context.Context, response
 	return response, nil
 }
 
+// sendMedia 请求上游的媒体类端点: 请求体沿用客户端原文, 仅替换其中的模型名称; 响应按上游原样返回。
+// 媒体类协议没有转换伙伴, 故不经 pipeline, 也不做跨协议还原。
+func sendMedia(ctx context.Context, spec protocolSpec, channel model.Channel, channelKey model.ChannelKey, body []byte, contentType, accept string, streaming bool) (*upstreamResponse, error) {
+	request := &httpclient.Request{
+		Method:      http.MethodPost,
+		URL:         protocolURL(channel, spec.protocol),
+		Headers:     http.Header{},
+		ContentType: contentType,
+		Body:        body,
+		Auth:        &httpclient.AuthConfig{Type: httpclient.AuthTypeBearer, APIKey: channelKey.Key},
+		APIFormat:   spec.format.String(),
+	}
+	request.Headers.Set("Content-Type", contentType)
+	// 客户端声明的可接受类型不作数: 各家 SDK 给出的 Accept 未必与该端点的响应形态相符, 由转发链路按协议定。
+	request.Headers.Set("Accept", accept)
+	if err := applyChannelConfig(channel, request); err != nil {
+		return nil, err
+	}
+
+	httpClient, closeIdle, err := resolveUpstreamClient(channel)
+	if err != nil {
+		return nil, err
+	}
+	if streaming {
+		// 流式响应返回后仍在读上游连接, 归还入口随响应交给消费方; 取不到响应时就地归还。
+		result, err := sendMediaStream(ctx, spec, request, httpClient)
+		if err != nil {
+			if closeIdle != nil {
+				closeIdle()
+			}
+			return nil, err
+		}
+		result.closeIdle = closeIdle
+		return result, nil
+	}
+	// 非流式响应在 Do 返回时正文已读完, 连接可以立即归还。
+	if closeIdle != nil {
+		defer closeIdle()
+	}
+
+	response, err := httpclient.NewHttpClientWithClient(httpClient).Do(ctx, request)
+	if err != nil {
+		var failure *httpclient.Error
+		if errors.As(err, &failure) && len(failure.Body) > 0 {
+			return nil, fmt.Errorf("%w: %s", err, failure.Body)
+		}
+		return nil, err
+	}
+	return &upstreamResponse{body: slices.Clone(response.Body), header: response.Headers.Clone(), usage: mediaUsage(response.Body)}, nil
+}
+
+// sendMediaStream 请求上游的媒体类流式端点: SSE 与二进制分块两种形态都按原样转发。
+// 媒体类的首个事件即内容, 没有对话类那种只含启动信息的空事件, 故不做暂存。
+func sendMediaStream(ctx context.Context, spec protocolSpec, request *httpclient.Request, client *http.Client) (*upstreamResponse, error) {
+	rawRequest, err := httpclient.BuildHttpRequest(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := client.Do(rawRequest)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode >= http.StatusBadRequest {
+		failure, readErr := io.ReadAll(response.Body)
+		response.Body.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		return nil, fmt.Errorf("upstream responded %s: %s", response.Status, failure)
+	}
+
+	contentType := response.Header.Get("Content-Type")
+	var decoder httpclient.StreamDecoder
+	if isBinaryStreamContentType(contentType) {
+		decoder = httpclient.NewBinaryChunkDecoder(contentType)(ctx, response.Body)
+	} else {
+		decoder = httpclient.NewDefaultSSEDecoder(ctx, response.Body)
+	}
+	for decoder.Next() {
+		event := decoder.Current()
+		if event == nil || (len(event.Data) == 0 && event.Type != httpclient.BinaryStreamDoneEventType) {
+			continue
+		}
+		last, err := inspectStreamEvent(spec.format, event)
+		if err != nil {
+			decoder.Close()
+			return nil, fmt.Errorf("%w: %s", err, event.Data)
+		}
+		return &upstreamResponse{header: response.Header.Clone(), events: decoder, first: event, last: last}, nil
+	}
+
+	err = decoder.Err()
+	decoder.Close()
+	if err == nil {
+		err = errors.New("upstream stream ended before first event")
+	}
+	return nil, err
+}
+
 // sendConverted 经 axonhub pipeline 把客户端请求转换成渠道协议后请求上游, 响应再转换回客户端协议。
 func sendConverted(ctx context.Context, format llm.APIFormat, raw *httpclient.Request, channel model.Channel, outbound transformer.Outbound, streaming bool) (*upstreamResponse, error) {
 	var inbound transformer.Inbound

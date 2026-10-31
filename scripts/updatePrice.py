@@ -13,7 +13,7 @@ LLM_PRICE_URL = "https://models.dev/api.json"
 
 # 研发商及其自研模型系列前缀，过滤同一平台提供的第三方模型。
 DEVELOPERS: dict[str, tuple[str, ...]] = {
-    "openai": ("gpt", "o"),
+    "openai": ("gpt", "o", "text-embedding"),
     "anthropic": ("claude",),
     "google": ("gemini", "gemma", "lyria", "veo"),
     "deepseek": ("deepseek",),
@@ -102,8 +102,6 @@ def main():
                 not model_id
                 or not model_family.startswith(family_prefixes)
                 or "text" not in output_modalities
-                or "embed" in model_id
-                or "embed" in model_family
             ):
                 continue
 

@@ -465,6 +465,7 @@
             "keysRequiredFirst": "请先添加凭据",
             "detailLoading": "正在加载渠道配置",
             "detailFailed": "渠道配置加载失败",
+            "grantProtocols": "协议",
             "grantExpandAll": "全部展开",
             "grantCollapseAll": "全部折叠",
             "modelAdd": "添加",
